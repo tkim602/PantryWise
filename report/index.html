@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Pantry-Aware Recipe Recommender — Final Report</title>
+  <meta name="description" content="Georgia Tech CS 4641 final report for a pantry-aware multi-objective recipe recommender." />
+  <style>
+    :root { --text:#1f2328; --muted:#626b75; --line:#d8dee4; --link:#245b9b; }
+    * { box-sizing:border-box; }
+    body { margin:0; color:var(--text); background:#fff; font-family:Georgia,Cambria,"Times New Roman",serif; font-size:16px; line-height:1.7; }
+    main { width:min(900px,calc(100% - 48px)); margin:64px auto 88px; }
+    header { text-align:center; padding-bottom:34px; margin-bottom:42px; border-bottom:1px solid var(--line); }
+    h1 { margin:0; font-size:2.7rem; line-height:1.12; }
+    .subtitle { margin:12px 0 18px; font-size:1.25rem; }
+    .meta,.authors,.type { margin:4px 0; color:var(--muted); font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif; font-size:.92rem; }
+    .authors { color:#3f4750; }
+    .type { margin-top:14px; color:var(--text); font-weight:650; text-transform:uppercase; letter-spacing:.07em; font-size:.78rem; }
+    h2 { margin:46px 0 16px; padding-bottom:8px; border-bottom:1px solid var(--line); font-size:1.55rem; }
+    h3 { margin:32px 0 12px; font-size:1.2rem; }
+    h4 { margin:24px 0 8px; font-size:1rem; }
+    p { margin:0 0 16px; }
+    ul,ol { padding-left:1.6rem; }
+    li { margin:7px 0; }
+    img { display:block; width:100%; height:auto; margin:20px auto; }
+    table { width:100%; border-collapse:collapse; margin:20px 0 30px; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif; font-size:.9rem; }
+    th,td { padding:10px 12px; border:1px solid var(--line); text-align:left; vertical-align:top; }
+    th { background:#f6f8fa; }
+    a { color:var(--link); text-decoration:none; }
+    a:hover { text-decoration:underline; }
+    code { font-family:"SFMono-Regular",Consolas,monospace; font-size:.9em; background:#f6f8fa; padding:.1em .3em; }
+    .note { color:var(--muted); font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif; font-size:.9rem; }
+    @media (max-width:700px) { main { width:min(100% - 28px,900px); margin:30px auto 56px; } h1 { font-size:2.15rem; } }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Pantry-Aware Recipe Recommender</h1>
+    <p class="subtitle">Multi-Objective Recipe Recommendation with Pantry, Nutrition, Sustainability, Taste, and Visual Signals</p>
+    <p class="meta">CS 4641 Machine Learning · Georgia Institute of Technology · Fall 2025</p>
+    <p class="authors">Eileen Chen · Euan Ham · Taeho Kim · Inho Lee · Kimberly Tsung</p>
+    <p class="type">Final Report</p>
+  </header>
+
+  <h2>Overview</h2>
+  <p>Most recipe recommenders optimize primarily for similarity, popularity, or collaborative-filtering signals. This project explores a broader recommendation objective: suggest recipes that are practical given a user's pantry while also considering taste, nutrition, sustainability, and visual similarity.</p>
+  <p>The project combines three complementary approaches: ingredient-based ranking with TF-IDF and K-Means, a LightGBM-based multi-objective pipeline for taste, nutrition, and sustainability, and ResNet50 image embeddings for visual retrieval.</p>
+
+  <h2>Data Sources</h2>
+  <ul>
+    <li><strong>Food Ingredients and Recipes Dataset with Images:</strong> 13,582 recipes with ingredient lists and corresponding images.</li>
+    <li><strong>Food.com:</strong> more than 230,000 recipes with ingredients, nutrition fields, and approximately 1.1M user ratings.</li>
+    <li><strong>Open Food Facts:</strong> product-level nutrition and environmental information, including Nutri-Score and Eco-Score.</li>
+  </ul>
+
+  <h2>Data & Preprocessing</h2>
+  <h3>Ingredient normalization</h3>
+  <p>Ingredient strings were normalized by lowercasing, removing quantities and measurement units, removing preparation descriptors, handling aliases, and lemmatizing terms. Fuzzy matching was used to improve pantry coverage when ingredient wording differed slightly.</p>
+  <p>Quantity-aware parsing preserved structured representations such as <code>{quantity, unit, name}</code> when possible so that downstream sustainability estimates could incorporate approximate ingredient mass instead of treating every ingredient equally.</p>
+
+  <h3>Text and image features</h3>
+  <p>Normalized ingredient text was represented with TF-IDF features. Food images were resized and normalized for a pretrained ResNet50, producing 2048-dimensional embeddings used for similarity-based retrieval.</p>
+
+  <h2>Modeling Approaches</h2>
+  <h3>1. Pantry-Aware K-Means Ranking</h3>
+  <p>Recipes were represented using TF-IDF ingredient features and clustered with K-Means. Final recommendation scores combined cosine similarity, pantry coverage, cluster affinity, and a sustainability term. A complexity penalty reduced the tendency to over-rank trivially short recipes.</p>
+  <p>The weighted ranking used TF-IDF similarity, pantry coverage, cluster score, and sustainability with default weights of 0.3, 0.3, 0.2, and 0.2.</p>
+
+  <img src="../model1/cluster_visualization.png" alt="K-Means recipe clusters projected with PCA" />
+  <p class="note">PCA projection of recipe clusters for K = 20.</p>
+
+  <img src="../model1/clustering_evaluation.png" alt="K-Means clustering evaluation" />
+  <p class="note">Elbow, silhouette, and Davies–Bouldin analyses used during cluster selection.</p>
+
+  <p>Average pantry coverage improved from 68% in the baseline to 72% in the K-Means-based system. The clustering metrics also showed that the sparse ingredient space was not strongly separated, so clustering is best interpreted as a candidate-grouping heuristic rather than evidence of naturally distinct cuisine clusters.</p>
+
+  <h3>2. LightGBM Multi-Objective Ranking</h3>
+  <p>The second approach used three LightGBM models: a binary taste classifier based on Food.com ratings, a nutrition regressor for Nutri-Score, and a sustainability regressor for Eco-Score. Feature engineering combined nutritional macros, recipe metadata, and compact text features derived from TF-IDF and SVD.</p>
+  <p>At recommendation time, recipes were filtered by pantry coverage and ranked using a weighted combination of predicted taste, nutrition, and sustainability. The final score prioritized taste slightly more heavily while still rewarding healthier and more sustainable options.</p>
+
+  <h4>Taste classification</h4>
+  <p>The taste model achieved 96.2% recall for highly rated recipes. Overall accuracy was 62.5%, only slightly above the majority-class baseline of 62.2%, so the classifier is better viewed as a high-recall quality filter than as a high-confidence taste predictor.</p>
+
+  <h4>Nutrition prediction</h4>
+  <p>The nutrition model achieved <strong>R² = 0.923</strong> with <strong>RMSE = 2.46</strong>, showing strong predictive fit relative to the Nutri-Score range.</p>
+
+  <h4>Sustainability prediction</h4>
+  <p>The sustainability model achieved <strong>R² = 0.695</strong> and <strong>Spearman ρ = 0.836</strong>. The ranking correlation was especially useful because recommendation quality depends more on ordering recipes consistently than on perfectly reproducing every score.</p>
+
+  <h3>3. ResNet50 Visual Retrieval</h3>
+  <p>A pretrained ResNet50 was used as a feature extractor rather than fine-tuned end-to-end. Recipe images were mapped to 2048-dimensional embeddings, and cosine similarity was used to retrieve visually related dishes.</p>
+  <p>The visual retrieval system reached roughly 91% hit rate at K = 10, with MRR around 0.49. This provided a complementary discovery signal, although image similarity alone cannot infer nutritional quality or ingredient quantities.</p>
+
+  <h2>Model Comparison</h2>
+  <table>
+    <thead><tr><th>Approach</th><th>Primary Strength</th><th>Main Limitation</th></tr></thead>
+    <tbody>
+      <tr><td>TF-IDF + K-Means</td><td>Pantry-aware ingredient matching and interpretable ranking factors</td><td>Weak natural cluster separation and heuristic sustainability estimates</td></tr>
+      <tr><td>LightGBM</td><td>Quantitative nutrition and sustainability prediction with multi-objective ranking</td><td>Taste classification is close to the majority baseline in accuracy; cross-dataset domain mismatch</td></tr>
+      <tr><td>ResNet50 embeddings</td><td>Visual similarity and intuitive image-based discovery</td><td>Does not directly model pantry, nutrition, or ingredient quantities</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Limitations</h2>
+  <ul>
+    <li>Ingredient quantity parsing remains difficult for complex strings such as package sizes and parenthetical measurements.</li>
+    <li>Missing ingredient carbon-footprint values require fallback assumptions, so sustainability scores should be interpreted as estimates.</li>
+    <li>The sustainability model is trained on Open Food Facts product text but applied to Food.com recipe text, creating a domain mismatch.</li>
+    <li>The visual model uses pretrained embeddings rather than task-specific fine-tuning.</li>
+  </ul>
+
+  <h2>Future Work</h2>
+  <p>Future work could combine the three approaches into a single multimodal ranking pipeline, improve ingredient parsing and alias coverage, incorporate better life-cycle-assessment data, add dietary restrictions and user preferences, and validate multi-objective ranking weights with user studies or A/B testing.</p>
+
+  <h2>Team Contributions</h2>
+  <table>
+    <thead><tr><th>Team Member</th><th>Contributions</th></tr></thead>
+    <tbody>
+      <tr><td>Eileen Chen</td><td>Model 1 cleaning; Model 3 implementation; report</td></tr>
+      <tr><td>Euan Ham</td><td>Model 1 cleaning/preprocessing; Model 3 implementation, evaluation, visualization; webmaster</td></tr>
+      <tr><td>Taeho Kim</td><td>Model 1 implementation; Model 2 implementation and evaluation; final presentation materials</td></tr>
+      <tr><td>Inho Lee</td><td>Model 1 implementation; Model 2 implementation and evaluation; final presentation materials</td></tr>
+      <tr><td>Kimberly Tsung</td><td>Model 1 evaluation; report</td></tr>
+    </tbody>
+  </table>
+
+  <h2>References</h2>
+  <ol>
+    <li>Tian et al., “RecipeRec: A Heterogeneous Graph Learning Model for Recipe Recommendation,” 2022.</li>
+    <li>Tian et al., “Recipe Recommendation With Hierarchical Graph Attention Network,” 2022.</li>
+    <li>Gao et al., “Food recommendation with graph convolutional network,” Information Sciences, 2022.</li>
+    <li>Ouyang et al., “Multimodal Recipe Recommendation with Heterogeneous Graph Neural Networks,” 2024.</li>
+    <li>Sinclair et al., “Sustainability in food-based dietary guidelines,” Annals of Medicine, 2025.</li>
+  </ol>
+</main>
+</body>
+</html>
