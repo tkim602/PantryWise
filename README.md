@@ -4,7 +4,7 @@ A Georgia Tech CS 4641 machine learning project exploring pantry-aware recipe re
 
 **Approaches:** TF-IDF + K-Means ranking, LightGBM models, and ResNet50 image embeddings.
 
-[View the final report](https://raw.githack.com/tkim602/PantryWise/main/report/index.html) · [HTML source](report/index.html)
+[PantryWise_Report](https://tkim602.github.io/PantryWise/)
 
 ## Repository
 
@@ -13,6 +13,5 @@ A Georgia Tech CS 4641 machine learning project exploring pantry-aware recipe re
 - `models/lightgbm/v1/` — earlier LightGBM experiments
 - `models/visual/` — ResNet50-based visual retrieval
 - `clean_data.py`, `preprocess_tags.py` — preprocessing utilities
-- `report/` — full final project report
 
 > Course group project. See the final report for team contributions and full evaluation details.
