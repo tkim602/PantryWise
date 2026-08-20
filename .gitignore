@@ -1,0 +1,18 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# OS / editors
+.DS_Store
+.vscode/
+.idea/
+
+# Local datasets and generated artifacts
+data/*
+!data/.gitkeep
+**/models/
+**/plots*/
+**/outputs/
+*.log
